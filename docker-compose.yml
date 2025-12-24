@@ -1,0 +1,62 @@
+version: "3"
+
+services:
+  # 1. Unbound: Recursive Resolver
+  unbound:
+    image: mvance/unbound:latest
+    container_name: unbound
+    restart: unless-stopped
+    volumes:
+      - ./unbound:/opt/unbound/etc/unbound:ro
+    networks:
+      dns_net:
+        ipv4_address: 172.20.0.3
+
+  # 2. Pi-Hole: Ad-blocker
+  pihole:
+    image: pihole/pihole:latest
+    container_name: pihole
+    restart: unless-stopped
+    depends_on:
+      - unbound
+    environment:
+      - TZ=${TZ}
+      - WEBPASSWORD=${PIHOLE_PASSWORD}
+      - PIHOLE_DNS=172.20.0.3#53
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+      - "80:80/tcp"
+    volumes:
+      - './pihole:/etc/pihole'
+      - './dnsmasq.d:/etc/dnsmasq.d'
+    networks:
+      dns_net:
+        ipv4_address: 172.20.0.2
+
+  # 3. Tailscale: Secure Tunnel
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: tailscale
+    restart: unless-stopped
+    environment:
+      - TS_AUTHKEY=${TS_AUTHKEY}
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_USERSPACE=false
+      # Advertise as exit node (allows you to route internet traffic through Pi)
+      - TS_EXTRA_ARGS=--advertise-exit-node --advertise-routes=${TS_ROUTES} --accept-dns=false
+    volumes:
+      - './tailscale:/var/lib/tailscale'
+      - '/dev/net/tun:/dev/net/tun'
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    networks:
+      - dns_net
+
+networks:
+  dns_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
