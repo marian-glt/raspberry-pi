@@ -13,7 +13,7 @@ services:
       FTLCONF_webserver_api_password: '${PIHOLE_PASSWORD}'
       FTLCONF_dns_listeningMode: 'ALL'
     volumes:
-      - './dns-stack/pihole/etc-pihole:/etc/pihole'
+      - '~/dns-stack/pihole/etc-pihole:/etc/pihole'
     cap_add:
       - SYS_NICE
   restart: unless-stopped
